@@ -300,3 +300,22 @@ function hideTooltip() {
     showStatus("error", "Ошибка инициализации: " + e.message);
   }
 })();
+
+document.getElementById("run-selftest").addEventListener("click", async () => {
+  const btn = document.getElementById("run-selftest");
+  btn.disabled = true;
+  showStatus("info", "Проверка luau-compile и GitHub…");
+  try {
+    const r = await api("/api/selftest", { method: "POST" });
+    const lines = [];
+    if (r.compile.ok) lines.push(`✅ Компилятор: OK (длина байт-кода: ${r.compile.bytecodeLength})`);
+    else lines.push(`❌ Компилятор: ${r.compile.error}`);
+    if (r.github.ok) lines.push(`✅ GitHub: OK (найдено скриптов: ${r.github.count})`);
+    else lines.push(`❌ GitHub: ${r.github.error}`);
+    showStatus(r.compile.ok && r.github.ok ? "success" : "error", lines.join(" · "));
+  } catch (err) {
+    showStatus("error", "Самодиагностика упала: " + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});

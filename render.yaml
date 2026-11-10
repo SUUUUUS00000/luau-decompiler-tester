@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: luau-decompiler-tester
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=400
+      - key: GITHUB_TOKEN
+        sync: false 

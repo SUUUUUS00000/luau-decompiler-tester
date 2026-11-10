@@ -1,22 +1,30 @@
-import { luau_compile } from "luau-web";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import path from "path";
+import { fileURLToPath } from "url";
 
-function toBase64(buffer) {
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  return Buffer.from(bytes).toString("base64");
-}
+const execFileAsync = promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LUAU_COMPILE_PATH = path.join(__dirname, "..", "bin", "luau-compile");
 
-export function compileLuau(source) {
-  const [success, result] = luau_compile(source);
-  if (!success) {
-    throw new Error(typeof result === "string" ? result : "Luau compilation failed");
-  }
-  return toBase64(result.buffer);
-}
-
-export function isCompilable(source) {
+export async function compileLuau(source) {
   try {
-    const [success] = luau_compile(source);
-    return !!success;
+    const { stdout } = await execFileAsync(LUAU_COMPILE_PATH, ["--binary", "-"], {
+      input: source,
+      maxBuffer: 10 * 1024 * 1024,
+      encoding: "buffer"
+    });
+    return stdout.toString("base64");
+  } catch (error) {
+    throw new Error(error.stderr?.toString() || "Luau compilation failed");
+  }
+}
+
+export async function isCompilable(source) {
+  try {
+    await compileLuau(source);
+    return true;
   } catch (e) {
     return false;
   }

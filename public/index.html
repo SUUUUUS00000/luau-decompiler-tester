@@ -17,10 +17,13 @@
       <h2>Декомпиляторы</h2>
       <form id="add-decompiler-form">
         <input type="text" id="dec-name" placeholder="Название" required>
-        <input type="url" id="dec-url" placeholder="URL API" required>
-        <select id="dec-method"><option>POST</option><option>GET</option></select>
-        <input type="text" id="dec-headers" placeholder='Заголовки (JSON)'>
-        <input type="text" id="dec-body" placeholder='Шаблон тела ({"bytecode":"__BYTECODE__"})'>
+        <input type="url" id="dec-url" placeholder="URL API (например, https://host/decompile)" required>
+        <select id="dec-method">
+          <option value="POST">POST</option>
+          <option value="GET">GET</option>
+        </select>
+        <input type="text" id="dec-headers" placeholder='Заголовки (JSON, опционально)'>
+        <input type="text" id="dec-body" placeholder='Шаблон тела: {"code":"__BYTECODE__"}'>
         <button type="submit">Добавить</button>
       </form>
       <ul id="decompiler-list"></ul>
@@ -36,6 +39,7 @@
         <option value="hard">Сложный — 355</option>
       </select>
       <button id="run-test">Запустить</button>
+      <button id="run-selftest" type="button" style="background:#6e6e73;">Самодиагностика</button>
       <div id="status"></div>
     </section>
 

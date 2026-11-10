@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -11,12 +12,12 @@ if (!fs.existsSync(BIN_PATH)) {
   console.warn(`[luau-compiler] Внимание: ${BIN_PATH} не найден. Запустите "npm install" для его установки.`);
 }
 
-function runProcess(source, timeoutMs = 15000) {
+function runCompilerOnFile(filePath, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(BIN_PATH)) {
       return reject(new Error("luau-compile не установлен (bin/luau-compile отсутствует)"));
     }
-    const proc = spawn(BIN_PATH, ["--binary", "-"], { timeout: timeoutMs });
+    const proc = spawn(BIN_PATH, ["--binary", filePath], { timeout: timeoutMs });
     const stdoutChunks = [];
     const stderrChunks = [];
     let killed = false;
@@ -47,30 +48,33 @@ function runProcess(source, timeoutMs = 15000) {
         reject(new Error(stderr || `luau-compile завершился с кодом ${code}`));
       }
     });
-
-    proc.stdin.on("error", () => {});
-    try {
-      proc.stdin.write(source);
-      proc.stdin.end();
-    } catch (e) {
-      try { proc.kill("SIGKILL"); } catch {}
-      reject(new Error(`Не удалось передать код в luau-compile: ${e.message}`));
-    }
   });
 }
 
-export async function compileLuau(source) {
-  if (typeof source !== "string" || source.length === 0) {
+async function compileSource(source, timeoutMs = 15000) {
+  if (typeof source !== "string" || source.trim().length === 0) {
     throw new Error("Пустой исходный код");
   }
-  const buf = await runProcess(source);
-  return buf.toString("base64");
+  const tmpDir = os.tmpdir();
+  const fileName = `luau-test-${Date.now()}-${Math.random().toString(36).slice(2)}.luau`;
+  const filePath = path.join(tmpDir, fileName);
+  fs.writeFileSync(filePath, source, "utf8");
+  try {
+    const buf = await runCompilerOnFile(filePath, timeoutMs);
+    return buf.toString("base64");
+  } finally {
+    try { fs.unlinkSync(filePath); } catch {}
+  }
+}
+
+export async function compileLuau(source) {
+  return compileSource(source);
 }
 
 export async function isCompilable(source) {
   if (typeof source !== "string" || source.trim().length === 0) return false;
   try {
-    await runProcess(source);
+    await compileSource(source);
     return true;
   } catch {
     return false;

@@ -1,17 +1,13 @@
-import luau_compile from "luau-web";
+import VM from "@nrbx/luau-vm";
 
 export function compileLuau(source) {
-  const [success, result] = luau_compile(source);
-  if (!success) {
-    throw new Error(result || "Luau compilation failed");
-  }
-  return Buffer.from(result.buffer).toString("base64");
+  return VM.compile(source);
 }
 
 export function isCompilable(source) {
   try {
-    const [success] = luau_compile(source);
-    return success;
+    VM.compile(source);
+    return true;
   } catch (e) {
     return false;
   }

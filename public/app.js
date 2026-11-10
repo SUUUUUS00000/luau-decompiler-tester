@@ -7,6 +7,10 @@ function el(tag, attrs = {}) {
   return e;
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   const json = await res.json().catch(() => ({}));
@@ -44,7 +48,7 @@ function renderDecompilers() {
   ul.innerHTML = "";
   for (const d of cachedDecompilers) {
     const li = document.createElement("li");
-    li.innerHTML = `<span><strong>${d.name}</strong> — ${d.url}</span>`;
+    li.innerHTML = `<span><strong>${escapeHtml(d.name)}</strong> — ${escapeHtml(d.url)}</span>`;
     const btn = document.createElement("button");
     btn.textContent = "Удалить";
     btn.onclick = async () => {
@@ -75,7 +79,8 @@ document.getElementById("add-decompiler-form").addEventListener("submit", async 
   let headers = {};
   const headersRaw = document.getElementById("dec-headers").value.trim();
   if (headersRaw) {
-    try { headers = JSON.parse(headersRaw); } catch (err) { alert("Некорректный JSON в заголовках"); return; }
+    try { headers = JSON.parse(headersRaw); }
+    catch { alert("Некорректный JSON в заголовках"); return; }
   }
   const bodyTemplate = document.getElementById("dec-body").value.trim();
   try {
@@ -98,9 +103,8 @@ document.getElementById("run-test").addEventListener("click", async () => {
   if (!decompilerId) return alert("Выберите декомпилятор");
 
   const btn = document.getElementById("run-test");
-  const status = document.getElementById("status");
   btn.disabled = true;
-  status.textContent = "Загрузка скриптов и запуск теста... (может занять 1–3 минуты)";
+  showStatus("info", "Загрузка скриптов и запуск теста… (может занять 1–3 минуты)");
 
   try {
     const result = await api("/api/test", {
@@ -108,14 +112,63 @@ document.getElementById("run-test").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decompilerId, difficulty, repoKey })
     });
-    status.textContent = `Готово: ${result.totalScripts} скриптов, среднее ${result.avgSimilarity}%`;
+    showTestResult(result);
     await fetchResults();
   } catch (err) {
-    status.textContent = "Ошибка: " + err.message;
+    showStatus("error", "Ошибка: " + err.message);
   } finally {
     btn.disabled = false;
   }
 });
+
+function showStatus(kind, text) {
+  const s = document.getElementById("status");
+  s.className = "status status-" + kind;
+  s.textContent = text;
+}
+
+function showTestResult(result) {
+  const s = document.getElementById("status");
+  s.className = "";
+  s.innerHTML = "";
+
+  let kind = "success";
+  let head = `Готово: ${result.totalScripts} из ${result.attemptedScripts} скриптов, среднее ${result.avgSimilarity}%`;
+  if (result.totalScripts === 0) { kind = "error"; head = `Тест провален: 0 из ${result.attemptedScripts} скриптов обработано`; }
+  else if (result.warnings.length > 0) { kind = "warning"; head = `Завершено с предупреждениями: ${result.totalScripts} скриптов, среднее ${result.avgSimilarity}%`; }
+
+  const summary = document.createElement("div");
+  summary.className = "status status-" + kind;
+  summary.textContent = head;
+  s.appendChild(summary);
+
+  if (result.warnings.length > 0) {
+    const ul = document.createElement("ul");
+    ul.className = "warnings-list";
+    result.warnings.forEach(w => {
+      const li = document.createElement("li");
+      li.textContent = w;
+      ul.appendChild(li);
+    });
+    s.appendChild(ul);
+  }
+
+  if (result.errors.length > 0) {
+    const det = document.createElement("details");
+    det.className = "errors-details";
+    const sm = document.createElement("summary");
+    sm.textContent = `Примеры ошибок (${result.errors.length})`;
+    det.appendChild(sm);
+    const ul = document.createElement("ul");
+    result.errors.forEach(e => {
+      const li = document.createElement("li");
+      li.textContent = e;
+      ul.appendChild(li);
+    });
+    det.appendChild(ul);
+    s.appendChild(det);
+  }
+}
 
 async function fetchResults() {
   cachedResults = await api("/api/results");
@@ -124,17 +177,41 @@ async function fetchResults() {
 }
 
 function renderResultCards(list) {
+  const latest = {};
+  for (const r of list) {
+    const cur = latest[r.decompilerName];
+    if (!cur || new Date(r.timestamp) > new Date(cur.timestamp)) latest[r.decompilerName] = r;
+  }
+  const entries = Object.values(latest).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
   const container = document.getElementById("results-container");
   container.innerHTML = "";
-  [...list].reverse().slice(0, 12).forEach(r => {
+
+  if (entries.length === 0) {
+    container.innerHTML = `<div class="empty-state">Тестов ещё не было</div>`;
+    return;
+  }
+
+  entries.forEach(r => {
     const card = document.createElement("div");
     card.className = "result-card";
+
+    let badge = "";
+    if (r.totalScripts === 0) {
+      card.classList.add("card-error");
+      badge = `<div class="card-badge badge-error">Провал: 0/${r.attemptedScripts}</div>`;
+    } else if (r.warnings && r.warnings.length > 0) {
+      card.classList.add("card-warning");
+      badge = `<div class="card-badge badge-warning">⚠ ${escapeHtml(r.warnings[0])}</div>`;
+    }
+
     card.innerHTML = `
-      <h3>${r.decompilerName}</h3>
+      <h3>${escapeHtml(r.decompilerName)}</h3>
       <div class="score">${r.avgSimilarity.toFixed(1)}%</div>
-      <div class="meta">${r.difficulty} · ${r.totalScripts} скриптов</div>
+      <div class="meta">${escapeHtml(r.difficulty)} · ${r.totalScripts}/${r.attemptedScripts || r.totalScripts} скриптов</div>
       <div class="meta">${new Date(r.timestamp).toLocaleString()}</div>
-      <div class="bar"><div class="bar-fill" style="width:${Math.min(100, r.avgSimilarity)}%"></div></div>
+      ${badge}
+      <div class="bar"><div class="bar-fill" style="width:${Math.min(100, Math.max(0, r.avgSimilarity))}%"></div></div>
     `;
     container.appendChild(card);
   });
@@ -143,7 +220,6 @@ function renderResultCards(list) {
 function renderChart(results) {
   const svg = document.getElementById("chart");
   svg.innerHTML = "";
-
   const W = 800, H = 400;
   const P = { top: 20, right: 160, bottom: 40, left: 55 };
   const plotW = W - P.left - P.right;
@@ -153,8 +229,7 @@ function renderChart(results) {
     const y = P.top + plotH - (v / 100) * plotH;
     svg.appendChild(el("line", {
       x1: P.left, y1: y, x2: P.left + plotW, y2: y,
-      stroke: v % 10 === 0 ? "#d2d2d7" : "#f0f0f5",
-      "stroke-width": 1
+      stroke: v % 10 === 0 ? "#d2d2d7" : "#f0f0f5", "stroke-width": 1
     }));
     if (v % 10 === 0) {
       const t = el("text", { x: P.left - 8, y: y + 4, "text-anchor": "end", "font-size": 10, fill: "#6e6e73" });
@@ -168,15 +243,13 @@ function renderChart(results) {
     if (!groups[r.decompilerName]) groups[r.decompilerName] = [];
     groups[r.decompilerName].push(r);
   }
-
   const names = Object.keys(groups);
   if (names.length === 0) {
-    const empty = el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", fill: "#a1a1a6", "font-size": 14 });
-    empty.textContent = "Пока нет результатов";
-    svg.appendChild(empty);
+    const t = el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", fill: "#a1a1a6", "font-size": 14 });
+    t.textContent = "Пока нет результатов";
+    svg.appendChild(t);
     return;
   }
-
   const maxLen = Math.max(...names.map(n => groups[n].length), 1);
 
   names.forEach((name, idx) => {
@@ -187,25 +260,17 @@ function renderChart(results) {
       y: P.top + plotH - (r.avgSimilarity / 100) * plotH,
       r
     }));
-
     if (points.length > 1) {
       const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
       svg.appendChild(el("path", { d, stroke: color, "stroke-width": 2, fill: "none" }));
     }
-
     points.forEach(p => {
-      const c = el("circle", {
-        cx: p.x, cy: p.y, r: 5,
-        fill: color, stroke: "#fff", "stroke-width": 2,
-        style: "cursor: pointer;"
-      });
-      c.addEventListener("mouseenter", (ev) => showTooltip(p.r, ev));
-      c.addEventListener("mousemove", (ev) => showTooltip(p.r, ev));
+      const c = el("circle", { cx: p.x, cy: p.y, r: 5, fill: color, stroke: "#fff", "stroke-width": 2, style: "cursor:pointer" });
+      c.addEventListener("mouseenter", ev => showTooltip(p.r, ev));
+      c.addEventListener("mousemove", ev => showTooltip(p.r, ev));
       c.addEventListener("mouseleave", hideTooltip);
-      c.addEventListener("click", (ev) => showTooltip(p.r, ev));
       svg.appendChild(c);
     });
-
     const legendY = P.top + idx * 22;
     svg.appendChild(el("rect", { x: W - P.right + 20, y: legendY - 8, width: 12, height: 12, fill: color, rx: 2 }));
     const lt = el("text", { x: W - P.right + 38, y: legendY + 2, "font-size": 11, fill: "#1d1d1f" });
@@ -220,7 +285,7 @@ function showTooltip(result, ev) {
   tt.style.display = "block";
   tt.style.left = (ev.clientX - wrap.left + 12) + "px";
   tt.style.top = (ev.clientY - wrap.top - 40) + "px";
-  tt.innerHTML = `<strong>${result.decompilerName}</strong><br>${result.difficulty} · ${result.totalScripts} скриптов<br><b>${result.avgSimilarity.toFixed(2)}%</b>`;
+  tt.innerHTML = `<strong>${escapeHtml(result.decompilerName)}</strong><br>${escapeHtml(result.difficulty)} · ${result.totalScripts}/${result.attemptedScripts || result.totalScripts}<br><b>${result.avgSimilarity.toFixed(2)}%</b>`;
 }
 
 function hideTooltip() {
@@ -232,6 +297,6 @@ function hideTooltip() {
     await Promise.all([fetchRepos(), fetchDecompilers()]);
     await fetchResults();
   } catch (e) {
-    console.error(e);
+    showStatus("error", "Ошибка инициализации: " + e.message);
   }
 })();

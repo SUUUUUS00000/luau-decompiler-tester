@@ -10,20 +10,17 @@
   <div class="container">
     <header>
       <h1>Luau Decompiler Tester</h1>
-      <p class="subtitle">Сравнение декомпиляторов LuaU / Lua для Roblox</p>
+      <p class="subtitle">Сравнение декомпиляторов на реальных скриптах из официальных репозиториев</p>
     </header>
 
     <section class="panel">
-      <h2>Добавить декомпилятор</h2>
+      <h2>Декомпиляторы</h2>
       <form id="add-decompiler-form">
         <input type="text" id="dec-name" placeholder="Название" required>
-        <input type="url" id="dec-url" placeholder="URL API (например, https://api.example.com/decompile)" required>
-        <select id="dec-method">
-          <option value="POST">POST</option>
-          <option value="GET">GET</option>
-        </select>
-        <input type="text" id="dec-headers" placeholder='Заголовки (JSON, например {"Authorization":"Bearer ..."})'>
-        <input type="text" id="dec-body" placeholder='Шаблон тела (JSON, например {"bytecode":"__BYTECODE__"})'>
+        <input type="url" id="dec-url" placeholder="URL API" required>
+        <select id="dec-method"><option>POST</option><option>GET</option></select>
+        <input type="text" id="dec-headers" placeholder='Заголовки (JSON)'>
+        <input type="text" id="dec-body" placeholder='Шаблон тела ({"bytecode":"__BYTECODE__"})'>
         <button type="submit">Добавить</button>
       </form>
       <ul id="decompiler-list"></ul>
@@ -31,17 +28,27 @@
 
     <section class="panel">
       <h2>Запустить тест</h2>
+      <select id="test-repo"></select>
       <select id="test-decompiler"></select>
       <select id="test-difficulty">
-        <option value="easy">Лёгкий (50 скриптов)</option>
-        <option value="normal">Нормальный (125 скриптов)</option>
-        <option value="hard">Сложный (355 скриптов)</option>
+        <option value="easy">Лёгкий — 50</option>
+        <option value="normal">Нормальный — 125</option>
+        <option value="hard">Сложный — 355</option>
       </select>
       <button id="run-test">Запустить</button>
+      <div id="status"></div>
     </section>
 
     <section class="panel">
-      <h2>Результаты</h2>
+      <h2>График результатов</h2>
+      <div id="chart-wrap">
+        <svg id="chart" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="tooltip"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Последние результаты</h2>
       <div id="results-container"></div>
     </section>
   </div>

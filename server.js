@@ -28,7 +28,11 @@ function loadJSON(file, def = []) {
 }
 
 function saveJSON(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error("Failed to save", file, e.message);
+  }
 }
 
 let decompilers = loadJSON(DECOMPILERS_FILE);
@@ -50,26 +54,33 @@ async function callDecompiler(decompiler, bytecode) {
     method,
     url,
     headers: { "Content-Type": "application/json", ...headers },
-    data: body,
+    data: method === "GET" ? undefined : body,
+    params: method === "GET" ? body : undefined,
     timeout: 30000,
-    validateStatus: () => true
+    validateStatus: () => true,
+    maxContentLength: 20 * 1024 * 1024,
+    maxBodyLength: 20 * 1024 * 1024
   });
 
   const data = response.data;
   if (typeof data === "string") return data;
-  if (data && typeof data === "object") return data.code || data.result || data.output || JSON.stringify(data);
+  if (data && typeof data === "object") {
+    return data.code || data.result || data.output || data.source || JSON.stringify(data);
+  }
   return "";
 }
 
 app.get("/health", (req, res) => res.status(200).send("OK"));
 
 app.get("/api/repos", (req, res) => {
-  res.json(Object.entries(REPOS).map(([key, cfg]) => ({
-    key,
-    owner: cfg.owner,
-    repo: cfg.repo,
-    label: `${cfg.owner}/${cfg.repo}`
-  })));
+  res.json(
+    Object.entries(REPOS).map(([key, cfg]) => ({
+      key,
+      owner: cfg.owner,
+      repo: cfg.repo,
+      label: `${cfg.owner}/${cfg.repo}`
+    }))
+  );
 });
 
 app.get("/api/decompilers", (req, res) => res.json(decompilers));
@@ -112,10 +123,11 @@ app.post("/api/test", async (req, res) => {
   }
 
   const testResults = [];
+
   for (const script of scripts) {
     let bytecode;
     try {
-      bytecode = compileLuau(script.code);
+      bytecode = await compileLuau(script.code);
     } catch (e) {
       continue;
     }
@@ -126,7 +138,7 @@ app.post("/api/test", async (req, res) => {
 
     try {
       decompiled = await callDecompiler(decompiler, bytecode);
-      decompiledCompiles = isCompilable(decompiled);
+      decompiledCompiles = await isCompilable(decompiled);
       similarity = computeSimilarity(script.code, decompiled, decompiledCompiles);
     } catch (e) {
       similarity = 0;
@@ -142,7 +154,9 @@ app.post("/api/test", async (req, res) => {
   }
 
   const avgSimilarity = testResults.length
-    ? Math.round((testResults.reduce((s, r) => s + r.similarity, 0) / testResults.length) * 100) / 100
+    ? Math.round(
+        (testResults.reduce((s, r) => s + r.similarity, 0) / testResults.length) * 100
+      ) / 100
     : 0;
 
   const entry = {
@@ -170,5 +184,12 @@ app.get("/api/results/:id", (req, res) => {
   res.json(r);
 });
 
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: err.message || "Internal server error" });
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => console.log(`Listening on ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Listening on ${PORT}`);
+});

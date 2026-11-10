@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Luau Decompiler Tester</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Luau Decompiler Tester</h1>
+      <p class="subtitle">Сравнение декомпиляторов LuaU / Lua для Roblox</p>
+    </header>
+
+    <section class="panel">
+      <h2>Добавить декомпилятор</h2>
+      <form id="add-decompiler-form">
+        <input type="text" id="dec-name" placeholder="Название" required>
+        <input type="url" id="dec-url" placeholder="URL API (например, https://api.example.com/decompile)" required>
+        <select id="dec-method">
+          <option value="POST">POST</option>
+          <option value="GET">GET</option>
+        </select>
+        <input type="text" id="dec-headers" placeholder='Заголовки (JSON, например {"Authorization":"Bearer ..."})'>
+        <input type="text" id="dec-body" placeholder='Шаблон тела (JSON, например {"bytecode":"__BYTECODE__"})'>
+        <button type="submit">Добавить</button>
+      </form>
+      <ul id="decompiler-list"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Запустить тест</h2>
+      <select id="test-decompiler"></select>
+      <select id="test-difficulty">
+        <option value="easy">Лёгкий (50 скриптов)</option>
+        <option value="normal">Нормальный (125 скриптов)</option>
+        <option value="hard">Сложный (355 скриптов)</option>
+      </select>
+      <button id="run-test">Запустить</button>
+    </section>
+
+    <section class="panel">
+      <h2>Результаты</h2>
+      <div id="results-container"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

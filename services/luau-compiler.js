@@ -1,6 +1,6 @@
-const luau_compile = require("luau-web").default;
+import luau_compile from "luau-web";
 
-function compileLuau(source) {
+export function compileLuau(source) {
   const [success, result] = luau_compile(source);
   if (!success) {
     throw new Error(result || "Luau compilation failed");
@@ -8,7 +8,7 @@ function compileLuau(source) {
   return Buffer.from(result.buffer).toString("base64");
 }
 
-function isCompilable(source) {
+export function isCompilable(source) {
   try {
     const [success] = luau_compile(source);
     return success;
@@ -16,5 +16,3 @@ function isCompilable(source) {
     return false;
   }
 }
-
-module.exports = { compileLuau, isCompilable };
